@@ -1,0 +1,95 @@
+name: basspro_player
+description: A professional Android music player with advanced equalizer
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # Audio playback
+  audio_service: ^0.18.12
+  just_audio: ^0.9.36
+  
+  # Database
+  sqflite: ^2.3.0
+  path: ^1.8.3
+  
+  # State management
+  flutter_riverpod: ^2.4.9
+  
+  # Permissions
+  permission_handler: ^11.0.1
+  
+  # Screen wake lock
+  wakelock_plus: ^1.2.8
+  
+  # UI
+  cached_network_image: ^3.3.0
+  flutter_svg: ^2.0.9
+  
+  # Splash screen
+  flutter_native_splash: ^2.3.5
+  
+  # Utilities
+  path_provider: ^2.1.1
+  shared_preferences: ^2.2.2
+  intl: ^0.18.1
+  
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  mockito: ^5.4.4
+  build_runner: ^2.4.7
+  sqflite_common_ffi: ^2.3.0
+  flutter_launcher_icons: ^0.13.1
+
+flutter:
+  uses-material-design: true
+  
+  assets:
+    - assets/images/
+    - assets/icons/
+
+# Icon generation configuration
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icon/app_icon.png"
+  adaptive_icon_background: "#6200EE"
+  adaptive_icon_foreground: "assets/icon/app_icon.png"
+  min_sdk_android: 21
+
+# Splash screen configuration
+flutter_native_splash:
+  android: true
+  ios: false
+  
+  # Background color - dark theme background
+  color: "#121212"
+  
+  # Splash screen image - use the app icon
+  image: assets/icon/app_icon.png
+  
+  # Branding image at bottom (app name)
+  branding: assets/images/splash_branding.png
+  
+  # Android 12+ specific settings
+  android_12:
+    color: "#121212"
+    image: assets/icon/app_icon.png
+    icon_background_color: "#6200EE"
+  
+  # Keep splash screen visible until explicitly removed
+  android_gravity: center
+  fullscreen: false
+  
+  # Web and other platforms disabled
+  web: false
