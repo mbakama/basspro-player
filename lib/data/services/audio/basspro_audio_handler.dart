@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
 import '../equalizer_service.dart';
@@ -80,6 +81,7 @@ class BassProAudioHandler extends BaseAudioHandler {
 
   /// Handle player errors (corrupted files, unsupported formats, etc.)
   void _handlePlayerError(Object error, StackTrace stackTrace) {
+    debugPrint('BassProAudioHandler: PLAYER ERROR: $error');
     _logger.error('Player error occurred', error, stackTrace);
     
     // Get current track name for error notification
@@ -125,6 +127,7 @@ class BassProAudioHandler extends BaseAudioHandler {
 
   /// Handle player state changes and broadcast to UI
   void _handlePlayerStateChange(PlayerState state) {
+    debugPrint('BassProAudioHandler: Player state changed: ${state.processingState}, playing: ${state.playing}');
     _logger.debug('Player state changed: ${state.processingState}, playing: ${state.playing}');
     _updatePlaybackState();
   }
@@ -278,6 +281,7 @@ class BassProAudioHandler extends BaseAudioHandler {
   Future<void> play() async {
     try {
       _logger.info('Play requested');
+      debugPrint('BassProAudioHandler: play() called');
       await _player.play();
       _updatePlaybackState();
     } catch (e) {
@@ -365,12 +369,14 @@ class BassProAudioHandler extends BaseAudioHandler {
   @override
   Future<void> skipToQueueItem(int index) async {
     try {
-      _logger.info('Skip to queue item $index requested');
+      debugPrint('BassProAudioHandler: skipToQueueItem($index) requested');
       if (index >= 0 && index < (_player.sequence?.length ?? 0)) {
         await _player.seek(Duration.zero, index: index);
         _updatePlaybackState();
         _updateMediaItem();
+        debugPrint('BassProAudioHandler: Skip to $index successful');
       } else {
+        debugPrint('BassProAudioHandler: Invalid queue index: $index (Queue length: ${_player.sequence?.length})');
         _logger.warning('Invalid queue index: $index');
       }
     } catch (e) {
@@ -498,6 +504,7 @@ class BassProAudioHandler extends BaseAudioHandler {
   Future<void> setQueue(List<MediaItem> mediaItems) async {
     try {
       _logger.info('Set queue with ${mediaItems.length} items');
+      debugPrint('BassProAudioHandler: setQueue called with ${mediaItems.length} items');
       
       // Create audio sources from media items
       final audioSources = mediaItems.map(_createAudioSource).toList();
@@ -566,6 +573,7 @@ class BassProAudioHandler extends BaseAudioHandler {
 
   /// Create an audio source from a media item
   AudioSource _createAudioSource(MediaItem mediaItem) {
+    debugPrint('BassProAudioHandler: Creating AudioSource for "${mediaItem.title}" (ID/URI: ${mediaItem.id})');
     final uri = Uri.parse(mediaItem.id);
     
     // Check if it's a local file or streaming URL

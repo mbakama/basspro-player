@@ -1,3 +1,5 @@
+import 'package:device_info_plus/device_info_plus.dart';
+import 'dart:io';
 import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -42,24 +44,27 @@ class LibraryScannerService {
     try {
       _logger.info('Requesting storage permissions');
 
-      // On Android 10+ (API 29+), we can use MediaStore without storage permission
-      // For older versions, we need READ_EXTERNAL_STORAGE
-      if (await Permission.storage.isGranted) {
-        _logger.info('Storage permission already granted');
+      // On Android 13+ (API 33+), we need READ_MEDIA_AUDIO
+      // On older versions, we need READ_EXTERNAL_STORAGE (Permission.storage)
+      
+      final Permission permission = await _getAudioPermission();
+      
+      if (await permission.isGranted) {
+        _logger.info('Permission already granted');
         return true;
       }
 
       // Request permission
-      final status = await Permission.storage.request();
+      final status = await permission.request();
 
       if (status.isGranted) {
-        _logger.info('Storage permission granted');
+        _logger.info('Permission granted');
         return true;
       } else if (status.isPermanentlyDenied) {
-        _logger.warning('Storage permission permanently denied');
+        _logger.warning('Permission permanently denied');
         throw PermissionError.storageDenied();
       } else {
-        _logger.warning('Storage permission denied');
+        _logger.warning('Permission denied');
         return false;
       }
     } catch (e) {
@@ -69,6 +74,18 @@ class LibraryScannerService {
       _logger.error('Error requesting permissions', e);
       throw PermissionError.generic('storage');
     }
+  }
+
+  Future<Permission> _getAudioPermission() async {
+    if (Platform.isAndroid) {
+      final deviceInfo = DeviceInfoPlugin();
+      final androidInfo = await deviceInfo.androidInfo;
+      // Android 13 (API 33) and above
+      if (androidInfo.version.sdkInt >= 33) {
+        return Permission.audio;
+      }
+    }
+    return Permission.storage;
   }
 
   /// Scan the device's music library and store tracks in the database

@@ -4,7 +4,9 @@ import '../../../core/utils/logger.dart';
 /// Service for scanning audio files from Android MediaStore
 class MediaStoreScanner {
   static const MethodChannel _channel =
-      MethodChannel('com.example.basspro_player/mediastore');
+      MethodChannel('com.basspro.player/mediastore');
+  
+  static final _logger = Logger.withTag('MediaStoreScanner');
 
   /// Query all audio files from Android MediaStore
   /// 
@@ -19,12 +21,12 @@ class MediaStoreScanner {
   /// - dateAdded: Date added timestamp in milliseconds
   Future<List<Map<String, dynamic>>> queryAudioFiles() async {
     try {
-      AppLogger.info('Querying audio files from MediaStore');
+      _logger.info('Querying audio files from MediaStore');
       
       final result = await _channel.invokeMethod<List<dynamic>>('queryAudioFiles');
       
       if (result == null) {
-        AppLogger.warning('MediaStore query returned null');
+        _logger.warning('MediaStore query returned null');
         return [];
       }
 
@@ -32,13 +34,13 @@ class MediaStoreScanner {
           .map((item) => Map<String, dynamic>.from(item as Map))
           .toList();
 
-      AppLogger.info('Found ${audioFiles.length} audio files');
+      _logger.info('Found ${audioFiles.length} audio files');
       return audioFiles;
     } on PlatformException catch (e) {
-      AppLogger.error('Failed to query audio files: ${e.message}', e);
+      _logger.error('Failed to query audio files: ${e.message}', e);
       rethrow;
     } catch (e) {
-      AppLogger.error('Unexpected error querying audio files', e);
+      _logger.error('Unexpected error querying audio files', e);
       rethrow;
     }
   }

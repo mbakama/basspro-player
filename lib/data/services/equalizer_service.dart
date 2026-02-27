@@ -59,10 +59,14 @@ class EqualizerService {
       _logger.info('Initializing equalizer service');
 
       // Enable the equalizer
+      _logger.info('Enabling AndroidEqualizer...');
       await _equalizer.setEnabled(true);
+      _logger.info('AndroidEqualizer enabled');
 
       // Get the equalizer parameters to determine available bands
+      _logger.info('Fetching equalizer parameters...');
       final params = await _equalizer.parameters;
+      _logger.info('Equalizer parameters fetched');
       final bands = params.bands;
 
       _logger.info('Equalizer has ${bands.length} bands');
@@ -76,10 +80,8 @@ class EqualizerService {
       _logger.info('Equalizer initialized successfully with ${bands.length} bands');
     } catch (e) {
       _logger.error('Failed to initialize equalizer', e);
-      if (e is AudioError) {
-        rethrow;
-      }
-      throw AudioError.initializationFailed(e.toString());
+      // Don't rethrow - allow app to function without equalizer if it fails to init
+      _logger.warning('App will continue without equalizer functionality');
     }
   }
 

@@ -19,6 +19,16 @@ class EqPresetRepositoryImpl implements EqPresetRepository {
   /// Built-in equalizer presets
   static final List<EqPreset> builtinPresets = [
     EqPreset(
+      name: 'Flat',
+      bandLevels: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+      preamp: 0.0,
+      subBass: 0.0,
+      bass: 0.0,
+      limiterEnabled: false,
+      createdAt: DateTime.now(),
+      isBuiltin: true,
+    ),
+    EqPreset(
       name: 'Deep Bass',
       bandLevels: [8.0, 6.0, 4.0, 2.0, 0.0, -1.0, -2.0, -2.0, -2.0, -2.0],
       preamp: -3.0,

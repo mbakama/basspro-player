@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:audio_service/audio_service.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../../../domain/entities/track.dart';
 import '../../../domain/repositories/playlist_repository.dart';
 import '../../../data/repositories/playlist_repository_impl.dart';
 import '../../../data/datasources/database/database_service.dart';
 import '../../../data/services/audio/audio_service_initializer.dart';
 import '../../../core/utils/format_utils.dart';
+import '../../widgets/artwork_image.dart';
 
 /// Playlist detail screen displaying tracks in a playlist with management options.
 /// 
@@ -309,27 +309,8 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                 borderRadius: BorderRadius.circular(4),
               ),
               child: track.artworkUri != null
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: CachedNetworkImage(
-                        imageUrl: track.artworkUri!,
-                        fit: BoxFit.cover,
-                        placeholder: (context, url) => const Center(
-                          child: SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                        ),
-                        errorWidget: (context, url, error) =>
-                            const Icon(Icons.music_note),
-                        memCacheWidth: 96, // 2x for retina displays
-                        memCacheHeight: 96,
-                        maxWidthDiskCache: 150,
-                        maxHeightDiskCache: 150,
-                      ),
-                    )
-                  : const Icon(Icons.music_note),
+                  ? ArtworkImage.track(artworkUri: track.artworkUri, width: 48, height: 48)
+                  : const Icon(Icons.music_note_rounded),
             ),
           ],
         ),

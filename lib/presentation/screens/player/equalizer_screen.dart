@@ -1,23 +1,12 @@
 import 'package:flutter/material.dart';
 import '../../../data/services/audio/audio_service_initializer.dart';
+import '../../../data/services/audio/basspro_audio_handler.dart';
 import '../../../data/services/equalizer_service.dart';
 import '../../../domain/entities/eq_preset.dart';
 import '../../../data/repositories/eq_preset_repository_impl.dart';
 import '../../../data/datasources/database/database_service.dart';
+import '../../../core/constants/app_colors.dart';
 
-/// Equalizer screen displayed as a modal bottom sheet
-///
-/// This screen provides professional-grade audio equalization controls:
-/// - Preset selector for quick configuration
-/// - Preamp gain control
-/// - 10-band frequency equalizer (32Hz to 16kHz)
-/// - Sub-bass and bass boost controls
-/// - Limiter toggle for anti-clipping protection
-/// - Warning indicator for clipping risk
-/// - Save preset functionality
-///
-/// All UI text is in French per requirement 1.5.
-/// All controls are wired to EqualizerService for real-time audio processing.
 class EqualizerScreen extends StatefulWidget {
   const EqualizerScreen({super.key});
 
@@ -30,7 +19,6 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
   List<EqPreset> _presets = [];
   EqPreset? _selectedPreset;
   
-  // Current equalizer state (synced with service)
   double _preamp = 0.0;
   final List<double> _bandLevels = List.filled(10, 0.0);
   double _subBass = 0.0;
@@ -39,19 +27,7 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
   bool _showClippingWarning = false;
   bool _isLoading = true;
 
-  // Frequency band labels
-  final List<String> _frequencyLabels = [
-    '32',
-    '64',
-    '125',
-    '250',
-    '500',
-    '1k',
-    '2k',
-    '4k',
-    '8k',
-    '16k',
-  ];
+  final List<String> _frequencyLabels = ['32', '64', '125', '250', '500', '1k', '2k', '4k', '8k', '16k'];
 
   @override
   void initState() {
@@ -59,28 +35,37 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
     _initializeEqualizer();
   }
 
-  /// Initialize equalizer service and load current settings
   Future<void> _initializeEqualizer() async {
     try {
-      // Get audio handler and equalizer service
-      final audioHandler = AudioServiceInitializer.audioHandler;
-      if (audioHandler == null) {
-        throw Exception('Audio service not initialized');
+      // Attendre que l'AudioService soit disponible avec timeout
+      BassProAudioHandler? audioHandler;
+      int attempts = 0;
+      const maxAttempts = 40; // 40 tentatives max (20 secondes)
+      
+      while (attempts < maxAttempts) {
+        audioHandler = AudioServiceInitializer.audioHandler;
+        if (audioHandler != null) break;
+        
+        attempts++;
+        await Future.delayed(const Duration(milliseconds: 500));
       }
-
+      
+      if (audioHandler == null) {
+        // Tenter de réinitialiser l'AudioService
+        try {
+          audioHandler = await AudioServiceInitializer.forceReinitialize();
+          await Future.delayed(const Duration(seconds: 1));
+        } catch (e) {
+          throw Exception('Audio service non disponible après tentative de réinitialisation: $e');
+        }
+      }
+      
       _equalizerService = audioHandler.equalizerService;
 
-      // Load presets from database
       final databaseService = DatabaseService();
       final presetRepo = EqPresetRepositoryImpl(databaseService);
-      
-      // Ensure built-in presets are initialized (lazy initialization)
-      // This is deferred from app startup for better performance
       await presetRepo.initializeBuiltinPresets();
-      
       final presets = await presetRepo.getAllEqPresets();
-
-      // Load current equalizer state
       final service = _equalizerService!;
       
       setState(() {
@@ -94,20 +79,16 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
         _isLoading = false;
       });
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      // Show error after frame is built
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Erreur lors du chargement de l\'égaliseur: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      });
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Égaliseur indisponible: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     }
   }
 
@@ -115,78 +96,79 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        decoration: const BoxDecoration(
+          color: AppColors.darkBackground,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
         ),
         child: const Center(
-          child: CircularProgressIndicator(),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text(
+                'Initialisation de l\'égaliseur...',
+                style: TextStyle(color: Colors.white70, fontSize: 14),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_equalizerService == null) {
+      return Container(
+        decoration: const BoxDecoration(
+          color: AppColors.darkBackground,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+        ),
+        child: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline, color: Colors.red, size: 48),
+              SizedBox(height: 16),
+              Text(
+                'Égaliseur indisponible',
+                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Veuillez redémarrer l\'application',
+                style: TextStyle(color: Colors.white70, fontSize: 14),
+              ),
+            ],
+          ),
         ),
       );
     }
 
     return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: const BoxDecoration(
+        color: AppColors.darkBackground,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Header
-          _buildHeader(context),
-          
-          // Scrollable content
+          _buildHandle(),
+          _buildHeader(),
           Flexible(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const SizedBox(height: 16),
-                  
-                  // Preset selector
                   _buildPresetSelector(),
-                  
                   const SizedBox(height: 24),
-                  const Divider(),
-                  const SizedBox(height: 16),
-                  
-                  // Preamp control
                   _buildPreampControl(),
-                  
-                  const SizedBox(height: 24),
-                  const Divider(),
-                  const SizedBox(height: 16),
-                  
-                  // Frequency bands
+                  const SizedBox(height: 32),
                   _buildFrequencyBands(),
-                  
-                  const SizedBox(height: 24),
-                  const Divider(),
-                  const SizedBox(height: 16),
-                  
-                  // Bass controls
-                  _buildBassControls(),
-                  
-                  const SizedBox(height: 24),
-                  const Divider(),
-                  const SizedBox(height: 16),
-                  
-                  // Limiter and warning
-                  _buildLimiterControl(),
-                  
-                  if (_showClippingWarning) ...[
-                    const SizedBox(height: 12),
-                    _buildClippingWarning(),
-                  ],
-                  
-                  const SizedBox(height: 24),
-                  
-                  // Save preset button
-                  _buildSavePresetButton(),
-                  
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 32),
+                  _buildBassBoostControls(),
+                  const SizedBox(height: 32),
+                  _buildLimiterToggle(),
+                  if (_showClippingWarning) _buildClippingWarning(),
+                  const SizedBox(height: 48),
                 ],
               ),
             ),
@@ -196,32 +178,26 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildHandle() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(
-            color: Theme.of(context).dividerColor,
-            width: 1,
-          ),
-        ),
-      ),
+      margin: const EdgeInsets.symmetric(vertical: 12),
+      width: 40, height: 4,
+      decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Expanded(
-            child: Text(
-              'Égaliseur',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.close),
-            onPressed: () => Navigator.of(context).pop(),
-            tooltip: 'Fermer',
+          const Text('ÉGALISEUR', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.5, fontSize: 18)),
+          TextButton.icon(
+            onPressed: _showSavePresetDialog,
+            icon: const Icon(Icons.save_rounded, size: 20),
+            label: const Text('Sauver'),
+            style: TextButton.styleFrom(foregroundColor: AppColors.darkPrimary),
           ),
         ],
       ),
@@ -229,495 +205,182 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
   }
 
   Widget _buildPresetSelector() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Préréglage',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey.shade700),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: DropdownButton<EqPreset?>(
-            value: _selectedPreset,
-            isExpanded: true,
-            underline: const SizedBox(),
-            hint: const Text('Sélectionner un préréglage'),
-            items: [
-              const DropdownMenuItem<EqPreset?>(
-                value: null,
-                child: Text('Personnalisé'),
-              ),
-              ..._presets.map((preset) {
-                return DropdownMenuItem<EqPreset?>(
-                  value: preset,
-                  child: Text(preset.name),
-                );
-              }),
-            ],
-            onChanged: (preset) async {
-              if (preset != null && _equalizerService != null) {
-                try {
-                  // Apply preset to equalizer service
-                  await _equalizerService!.applyPreset(preset);
-                  
-                  // Update UI state
-                  setState(() {
-                    _selectedPreset = preset;
-                    _preamp = _equalizerService!.preamp;
-                    _bandLevels.setAll(0, _equalizerService!.bandLevels);
-                    _subBass = _equalizerService!.subBass;
-                    _bass = _equalizerService!.bass;
-                    _limiterEnabled = _equalizerService!.limiterEnabled;
-                    _showClippingWarning = _equalizerService!.isClippingRisk();
-                  });
-                } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Erreur lors de l\'application du préréglage: $e'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                  }
-                }
-              } else {
-                setState(() {
-                  _selectedPreset = null;
-                });
-              }
-            },
-          ),
-        ),
-      ],
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(color: AppColors.darkSurface, borderRadius: BorderRadius.circular(12)),
+      child: DropdownButton<EqPreset?>(
+        value: _selectedPreset,
+        isExpanded: true,
+        underline: const SizedBox(),
+        dropdownColor: AppColors.darkSurface,
+        hint: const Text('Préréglages'),
+        items: [
+          const DropdownMenuItem<EqPreset?>(value: null, child: Text('Personnalisé')),
+          ..._presets.map((p) => DropdownMenuItem(value: p, child: Text(p.name))),
+        ],
+        onChanged: (p) async {
+          if (p != null && _equalizerService != null) {
+            await _equalizerService!.applyPreset(p);
+            setState(() {
+              _selectedPreset = p;
+              _preamp = _equalizerService!.preamp;
+              _bandLevels.setAll(0, _equalizerService!.bandLevels);
+              _subBass = _equalizerService!.subBass;
+              _bass = _equalizerService!.bass;
+              _showClippingWarning = _equalizerService!.isClippingRisk();
+            });
+          }
+        },
+      ),
     );
   }
 
   Widget _buildPreampControl() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Préampli',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            Text(
-              '${_preamp.toStringAsFixed(1)} dB',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey.shade400,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Slider(
-          value: _preamp,
-          min: -10.0,
-          max: 10.0,
-          divisions: 40,
-          label: '${_preamp.toStringAsFixed(1)} dB',
-          onChanged: (value) async {
-            setState(() {
-              _preamp = value;
-              _selectedPreset = null; // Mark as custom
-            });
-            
-            // Apply to equalizer service in real-time
-            if (_equalizerService != null) {
-              try {
-                await _equalizerService!.setPreamp(value);
-                setState(() {
-                  _showClippingWarning = _equalizerService!.isClippingRisk();
-                });
-              } catch (e) {
-                // Log error but don't interrupt user interaction
-                debugPrint('Error setting preamp: $e');
-              }
-            }
-          },
-        ),
-      ],
-    );
+    return _buildSliderRow('PREAMP', _preamp, -10, 10, (v) {
+      setState(() { _preamp = v; _selectedPreset = null; });
+      _equalizerService?.setPreamp(v);
+    });
   }
 
   Widget _buildFrequencyBands() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Bandes de fréquence',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 16),
+        const Text('FRÉQUENCES', style: TextStyle(fontSize: 10, letterSpacing: 2, color: Colors.white38)),
+        const SizedBox(height: 24),
         SizedBox(
-          height: 200,
+          height: 180,
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: List.generate(10, (index) {
-              return Expanded(
-                child: _buildFrequencyBandSlider(index),
-              );
-            }),
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: List.generate(10, (i) => _buildVerticalBand(i)),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildFrequencyBandSlider(int index) {
+  Widget _buildVerticalBand(int index) {
     return Column(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        // dB value
-        Text(
-          _bandLevels[index].toStringAsFixed(0),
-          style: TextStyle(
-            fontSize: 10,
-            color: Colors.grey.shade400,
-          ),
-        ),
-        
-        // Vertical slider
+        Text(_bandLevels[index].toStringAsFixed(0), style: const TextStyle(fontSize: 10, color: AppColors.darkPrimary)),
         Expanded(
-          child: RotatedBox(
-            quarterTurns: 3,
-            child: Slider(
-              value: _bandLevels[index],
-              min: -15.0,
-              max: 15.0,
-              divisions: 30,
-              onChanged: (value) async {
-                setState(() {
-                  _bandLevels[index] = value;
-                  _selectedPreset = null; // Mark as custom
-                });
-                
-                // Apply to equalizer service in real-time
-                if (_equalizerService != null) {
-                  try {
-                    await _equalizerService!.setBandLevel(index, value);
-                    setState(() {
-                      _showClippingWarning = _equalizerService!.isClippingRisk();
-                    });
-                  } catch (e) {
-                    // Log error but don't interrupt user interaction
-                    debugPrint('Error setting band level: $e');
-                  }
-                }
-              },
+          child: SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              trackHeight: 2,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+              overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+              activeTrackColor: AppColors.darkPrimary,
+              inactiveTrackColor: Colors.white10,
+            ),
+            child: RotatedBox(
+              quarterTurns: 3,
+              child: Slider(
+                value: _bandLevels[index],
+                min: -15, max: 15,
+                onChanged: (v) {
+                  setState(() { _bandLevels[index] = v; _selectedPreset = null; });
+                  _equalizerService?.setBandLevel(index, v);
+                },
+              ),
             ),
           ),
         ),
-        
-        // Frequency label
-        Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: Text(
-            _frequencyLabels[index],
-            style: const TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
+        Text(_frequencyLabels[index], style: const TextStyle(fontSize: 10, color: Colors.white24)),
       ],
     );
   }
 
-  Widget _buildBassControls() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Contrôles de basses',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 16),
-        
-        // Sub-bass control
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Sub-Bass',
-              style: TextStyle(fontSize: 14),
-            ),
-            Text(
-              '${_subBass.toStringAsFixed(1)} dB',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey.shade400,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-        Slider(
-          value: _subBass,
-          min: 0.0,
-          max: 12.0,
-          divisions: 24,
-          label: '${_subBass.toStringAsFixed(1)} dB',
-          onChanged: (value) async {
-            setState(() {
-              _subBass = value;
-              _selectedPreset = null; // Mark as custom
-            });
-            
-            // Apply to equalizer service in real-time
-            if (_equalizerService != null) {
-              try {
-                await _equalizerService!.setSubBass(value);
-                // Update band levels from service (sub-bass affects bands 0 and 1)
-                setState(() {
-                  _bandLevels.setAll(0, _equalizerService!.bandLevels);
-                  _showClippingWarning = _equalizerService!.isClippingRisk();
-                });
-              } catch (e) {
-                debugPrint('Error setting sub-bass: $e');
-              }
-            }
-          },
-        ),
-        
-        const SizedBox(height: 16),
-        
-        // Bass control
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Bass',
-              style: TextStyle(fontSize: 14),
-            ),
-            Text(
-              '${_bass.toStringAsFixed(1)} dB',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey.shade400,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-        Slider(
-          value: _bass,
-          min: 0.0,
-          max: 12.0,
-          divisions: 24,
-          label: '${_bass.toStringAsFixed(1)} dB',
-          onChanged: (value) async {
-            setState(() {
-              _bass = value;
-              _selectedPreset = null; // Mark as custom
-            });
-            
-            // Apply to equalizer service in real-time
-            if (_equalizerService != null) {
-              try {
-                await _equalizerService!.setBass(value);
-                // Update band levels from service (bass affects bands 2 and 3)
-                setState(() {
-                  _bandLevels.setAll(0, _equalizerService!.bandLevels);
-                  _showClippingWarning = _equalizerService!.isClippingRisk();
-                });
-              } catch (e) {
-                debugPrint('Error setting bass: $e');
-              }
-            }
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildLimiterControl() {
+  Widget _buildBassBoostControls() {
     return Row(
       children: [
-        Checkbox(
-          value: _limiterEnabled,
-          onChanged: (value) async {
-            final enabled = value ?? true;
-            setState(() {
-              _limiterEnabled = enabled;
-            });
-            
-            // Apply to equalizer service
-            if (_equalizerService != null) {
-              try {
-                await _equalizerService!.setLimiterEnabled(enabled);
-                setState(() {
-                  _showClippingWarning = _equalizerService!.isClippingRisk();
-                });
-              } catch (e) {
-                debugPrint('Error setting limiter: $e');
-              }
-            }
-          },
-        ),
-        const Expanded(
-          child: Text(
-            'Limiteur activé',
-            style: TextStyle(fontSize: 14),
-          ),
+        Expanded(child: _buildSmallSlider('SUB-BASS', _subBass, 0, 12, (v) {
+          setState(() { _subBass = v; _selectedPreset = null; });
+          _equalizerService?.setSubBass(v);
+          setState(() => _bandLevels.setAll(0, _equalizerService!.bandLevels));
+        })),
+        const SizedBox(width: 16),
+        Expanded(child: _buildSmallSlider('BASS', _bass, 0, 12, (v) {
+          setState(() { _bass = v; _selectedPreset = null; });
+          _equalizerService?.setBass(v);
+          setState(() => _bandLevels.setAll(0, _equalizerService!.bandLevels));
+        })),
+      ],
+    );
+  }
+
+  Widget _buildSmallSlider(String label, double val, double min, double max, ValueChanged<double> onChg) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white30)),
+        SliderTheme(
+          data: SliderTheme.of(context).copyWith(trackHeight: 2, thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5)),
+          child: Slider(value: val, min: min, max: max, activeColor: AppColors.darkSecondary, onChanged: onChg),
         ),
       ],
+    );
+  }
+
+  Widget _buildSliderRow(String label, double val, double min, double max, ValueChanged<double> onChg) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white54)),
+            Text('${val.toStringAsFixed(1)} dB', style: const TextStyle(color: AppColors.darkPrimary, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        Slider(value: val, min: min, max: max, activeColor: AppColors.darkPrimary, onChanged: onChg),
+      ],
+    );
+  }
+
+  Widget _buildLimiterToggle() {
+    return SwitchListTile(
+      contentPadding: EdgeInsets.zero,
+      title: const Text('Limiteur Active', style: TextStyle(fontSize: 14)),
+      subtitle: const Text('Protection contre la saturation', style: TextStyle(fontSize: 12, color: Colors.white30)),
+      activeThumbColor: AppColors.darkPrimary,
+      value: _limiterEnabled,
+      onChanged: (v) {
+        setState(() => _limiterEnabled = v);
+        _equalizerService?.setLimiterEnabled(v);
+      },
     );
   }
 
   Widget _buildClippingWarning() {
     return Container(
+      margin: const EdgeInsets.only(top: 16),
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.orange.shade900.withValues(alpha: 0.3),
-        border: Border.all(color: Colors.orange.shade700),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
+      decoration: BoxDecoration(color: Colors.red.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.red.withValues(alpha: 0.3))),
+      child: const Row(
         children: [
-          Icon(
-            Icons.warning_amber_rounded,
-            color: Colors.orange.shade400,
-            size: 20,
-          ),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Text(
-              'Risque de distorsion détecté',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
+          Icon(Icons.warning_amber_rounded, color: Colors.red, size: 20),
+          SizedBox(width: 12),
+          Expanded(child: Text('Saturation détectée ! Réduisez le preamp.', style: TextStyle(color: Colors.red, fontSize: 13))),
         ],
       ),
     );
   }
 
-  Widget _buildSavePresetButton() {
-    return ElevatedButton.icon(
-      onPressed: () {
-        _showSavePresetDialog();
-      },
-      icon: const Icon(Icons.save),
-      label: const Text('Sauvegarder préréglage'),
-      style: ElevatedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
-      ),
-    );
-  }
-
   void _showSavePresetDialog() {
-    final TextEditingController nameController = TextEditingController();
-    
+    final controller = TextEditingController();
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Sauvegarder préréglage'),
-        content: TextField(
-          controller: nameController,
-          decoration: const InputDecoration(
-            labelText: 'Nom du préréglage',
-            hintText: 'Mon préréglage personnalisé',
-          ),
-          autofocus: true,
-        ),
+      builder: (c) => AlertDialog(
+        title: const Text('Nom du préréglage'),
+        content: TextField(controller: controller, autofocus: true),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Annuler'),
-          ),
-          TextButton(
-            onPressed: () async {
-              final name = nameController.text.trim();
-              if (name.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Le nom du préréglage ne peut pas être vide'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-                return;
-              }
-
-              try {
-                // Create preset from current settings
-                final preset = EqPreset(
-                  name: name,
-                  bandLevels: List.from(_bandLevels),
-                  preamp: _preamp,
-                  subBass: _subBass,
-                  bass: _bass,
-                  limiterEnabled: _limiterEnabled,
-                  createdAt: DateTime.now(),
-                  isBuiltin: false,
-                );
-
-                // Save to database
-                final databaseService = DatabaseService();
-                final presetRepo = EqPresetRepositoryImpl(databaseService);
-                await presetRepo.insertEqPreset(preset);
-
-                // Reload presets
-                final presets = await presetRepo.getAllEqPresets();
-                setState(() {
-                  _presets = presets;
-                  _selectedPreset = presets.firstWhere(
-                    (p) => p.name == name,
-                    orElse: () => preset,
-                  );
-                });
-
-                if (mounted) {
-                  Navigator.of(context).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Préréglage sauvegardé'),
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (mounted) {
-                  Navigator.of(context).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Erreur lors de la sauvegarde: $e'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              }
-            },
-            child: const Text('Enregistrer'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(c), child: const Text('ANNULER')),
+          TextButton(onPressed: () async {
+            if (controller.text.isEmpty) return;
+            if (!context.mounted) return;
+            final p = EqPreset(name: controller.text, bandLevels: List.from(_bandLevels), preamp: _preamp, subBass: _subBass, bass: _bass, limiterEnabled: _limiterEnabled, createdAt: DateTime.now(), isBuiltin: false);
+            await EqPresetRepositoryImpl(DatabaseService()).insertEqPreset(p);
+            if (context.mounted) Navigator.pop(c);
+          }, child: const Text('SAUVER')),
         ],
       ),
     );

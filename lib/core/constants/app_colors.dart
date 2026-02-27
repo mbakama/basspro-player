@@ -2,41 +2,37 @@ import 'package:flutter/material.dart';
 
 /// Color palette constants for BassPro Player
 class AppColors {
-  // Dark Theme Colors (Default)
-  static const Color darkBackground = Color(0xFF121212);
-  static const Color darkSurface = Color(0xFF1E1E1E);
-  static const Color darkPrimary = Color(0xFFBB86FC);
-  static const Color darkSecondary = Color(0xFF03DAC6);
-  static const Color darkError = Color(0xFFCF6679);
+  // --- Dark Theme Tokens (Premium Audio Player) ---
+  static const Color darkBackground = Color(0xFF0C0C0E); // Deep Charcoal
+  static const Color darkSurface = Color(0xFF1A1B1F);    // Grey Steel
+  static const Color darkPrimary = Color(0xFF00E5FF);    // Electric Blue
+  static const Color darkSecondary = Color(0xFF7C4DFF);  // Deep Purple (Bass highlight)
+  static const Color darkError = Color(0xFFFF5252);
   static const Color darkTextPrimary = Color(0xFFFFFFFF);
-  static const Color darkTextSecondary = Color(0xFFB3B3B3);
-  static const Color darkDivider = Color(0xFF2C2C2C);
+  static const Color darkTextSecondary = Color(0xFFA0A0A0);
+  static const Color darkDivider = Color(0xFF2A2B2F);
 
-  // Light Theme Colors
-  static const Color lightBackground = Color(0xFFFFFFFF);
-  static const Color lightSurface = Color(0xFFF5F5F5);
-  static const Color lightPrimary = Color(0xFF6200EE);
-  static const Color lightSecondary = Color(0xFF018786);
-  static const Color lightError = Color(0xFFB00020);
-  static const Color lightTextPrimary = Color(0xFF000000);
+  // --- Light Theme Tokens ---
+  static const Color lightBackground = Color(0xFFF8F9FA);
+  static const Color lightSurface = Color(0xFFFFFFFF);
+  static const Color lightPrimary = Color(0xFF00B8D4);
+  static const Color lightSecondary = Color(0xFF6200EA);
+  static const Color lightError = Color(0xFFD32F2F);
+  static const Color lightTextPrimary = Color(0xFF121212);
   static const Color lightTextSecondary = Color(0xFF666666);
   static const Color lightDivider = Color(0xFFE0E0E0);
 
-  // Common colors (used in both themes)
-  static const Color success = Color(0xFF4CAF50);
-  static const Color warning = Color(0xFFFF9800);
-  static const Color info = Color(0xFF2196F3);
+  // --- Common colors ---
+  static const Color success = Color(0xFF00E676);
+  static const Color warning = Color(0xFFFFAB40);
+  static const Color info = Color(0xFF40C4FF);
 
-  // Equalizer colors
-  static const Color eqSliderActive = Color(0xFFBB86FC);
-  static const Color eqSliderInactive = Color(0xFF666666);
-  static const Color eqWarning = Color(0xFFFF9800);
-  static const Color eqDanger = Color(0xFFCF6679);
-
-  // Player colors
-  static const Color playButtonActive = Color(0xFFBB86FC);
-  static const Color favoriteActive = Color(0xFFCF6679);
-  static const Color shuffleActive = Color(0xFF03DAC6);
+  // --- Specialized colors (Design Spec) ---
+  static const Color playButtonActive = darkPrimary;
+  static const Color favoriteActive = Color(0xFFFF4081);
+  static const Color shuffleActive = Color(0xFF00E5FF);
+  static const Color bassHighlight = darkSecondary;
+  static const Color glassSurface = Color(0x33FFFFFF);
 
   // Private constructor to prevent instantiation
   AppColors._();

@@ -45,23 +45,24 @@ class AudioServiceInitializer {
         return _audioHandler!;
       }
 
-      // Create AudioPlayer instance
-      final audioPlayer = AudioPlayer();
-      _logger.debug('AudioPlayer instance created');
-
       // Create AndroidEqualizer for the audio player
       final equalizer = AndroidEqualizer();
-      await audioPlayer.setAudioSource(
-        AudioSource.uri(Uri.parse('silence')),
-        initialPosition: Duration.zero,
-        preload: false,
-      );
       _logger.debug('AndroidEqualizer instance created');
+
+      // Create AudioPlayer instance with the equalizer in the pipeline
+      final audioPlayer = AudioPlayer(
+        audioPipeline: AudioPipeline(androidAudioEffects: [equalizer]),
+      );
+      _logger.debug('AudioPlayer instance created with AudioPipeline');
 
       // Create EqualizerService instance
       final equalizerService = EqualizerService(audioPlayer, equalizer);
-      await equalizerService.initialize();
-      _logger.debug('EqualizerService initialized');
+      
+      // Fire and forget equalizer initialization to prevent hanging the startup process
+      equalizerService.initialize().catchError((e) {
+        _logger.warning('Background Equalizer initialization failed: $e');
+      });
+      _logger.debug('EqualizerService initialization started in background');
 
       // Initialize audio_service with BassProAudioHandler
       // The AudioService.init method sets up the background service
@@ -75,7 +76,7 @@ class AudioServiceInitializer {
           androidNotificationChannelDescription: 'Contrôles de lecture audio',
           
           // Notification configuration
-          androidNotificationOngoing: true, // Keep notification while playing
+          androidNotificationOngoing: false, // Fixed: cannot be true with androidStopForegroundOnPause: false
           androidNotificationClickStartsActivity: true, // Tap opens app
           androidShowNotificationBadge: true,
           
@@ -106,6 +107,33 @@ class AudioServiceInitializer {
       return _audioHandler!;
     } catch (e, stackTrace) {
       _logger.error('Failed to initialize audio service', e, stackTrace);
+      rethrow;
+    }
+  }
+
+  /// Force reinitialize the audio service.
+  ///
+  /// This method disposes the existing handler and creates a new one.
+  /// Use this when the initial initialization failed or when you need
+  /// to restart the audio service.
+  ///
+  /// Returns the newly initialized BassProAudioHandler instance.
+  /// Throws an exception if initialization fails.
+  static Future<BassProAudioHandler> forceReinitialize() async {
+    try {
+      _logger.info('Force reinitializing audio service...');
+      
+      // Dispose existing handler if any
+      if (_audioHandler != null) {
+        await _audioHandler!.dispose();
+        _audioHandler = null;
+        _logger.info('Existing audio handler disposed');
+      }
+      
+      // Initialize fresh
+      return await initialize();
+    } catch (e, stackTrace) {
+      _logger.error('Failed to force reinitialize audio service', e, stackTrace);
       rethrow;
     }
   }

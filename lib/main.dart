@@ -50,7 +50,14 @@ void _initializeAppAsync() {
         deferPresetInitialization: true, // Defer non-critical initialization
       );
 
-      final audioHandler = await initService.initialize();
+      // Add timeout to prevent hanging indefinitely
+      final audioHandler = await initService.initialize().timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          AppLoggers.app.warning('Initialization timed out after 10 seconds');
+          return null;
+        },
+      );
 
       if (audioHandler != null) {
         AppLoggers.app.info('BassPro Player initialized successfully');
